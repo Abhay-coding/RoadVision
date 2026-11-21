@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import argparse
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 from PIL import Image
 
 from src.inference import RoadVisionSegmentor
@@ -26,7 +25,8 @@ def parse_args():
     parser.add_argument("--output-dir", type=str, default="outputs/metrics", help="Directory to save metric files")
     parser.add_argument("--plot-dir", type=str, default="outputs/plots", help="Directory to save evaluation plots")
     parser.add_argument("--model", type=str, default="nvidia/segformer-b0-finetuned-cityscapes-1024-1024")
-    parser.add_argument("--architecture", type=str, default="segformer")
+    parser.add_argument("--architecture", choices=["segformer"], default="segformer",
+                        help="Model architecture for Cityscapes labels")
     parser.add_argument("--samples", type=int, default=10, help="Number of road scenes to benchmark")
     parser.add_argument("--seed", type=int, default=42, help="Deterministic random seed")
     return parser.parse_args()
@@ -52,6 +52,7 @@ def main():
         return
 
     segmentor = RoadVisionSegmentor(model_name=args.model, architecture=args.architecture)
+    import matplotlib.pyplot as plt
 
     # Pre-compute clean baseline predictions and targets
     clean_images = []

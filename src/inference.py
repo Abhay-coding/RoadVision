@@ -187,6 +187,16 @@ class RoadVisionSegmentor:
             self.model.to(self.device)
             self.model.eval()
             self.transforms = weights.transforms()
+            self.class_names = dict(enumerate(weights.meta["categories"]))
+            # PASCAL VOC colors in the same class order as torchvision's weights.
+            self.palette = dict(enumerate([
+                (0, 0, 0), (128, 0, 0), (0, 128, 0), (128, 128, 0),
+                (0, 0, 128), (128, 0, 128), (0, 128, 128), (128, 128, 128),
+                (64, 0, 0), (192, 0, 0), (64, 128, 0), (192, 128, 0),
+                (64, 0, 128), (192, 0, 128), (64, 128, 128), (192, 128, 128),
+                (0, 64, 0), (128, 64, 0), (0, 192, 0), (128, 192, 0),
+                (0, 64, 128),
+            ]))
         else:
             raise ValueError(f"Unsupported architecture '{self.architecture}'. Use 'segformer' or 'deeplabv3'.")
             

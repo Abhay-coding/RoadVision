@@ -64,7 +64,7 @@ When 5 authentic Cityscapes validation pairs (`leftImg8bit/val` and `gtFine/val/
 
 ## Priority 2: Visual Segmentation Quality Verification
 
-The generated verification artifacts are saved in [`outputs/plots/audit_visualizations/`](file:///e:/RoadVision/outputs/plots/audit_visualizations/):
+The generated verification artifacts are saved in [`outputs/plots/audit_visualizations/`](../outputs/plots/audit_visualizations/):
 
 - `frankfurt_000000_000294_side_by_side.png`
 - `frankfurt_000000_000576_side_by_side.png`
@@ -118,15 +118,15 @@ Each figure provides a 4-panel comparison:
 
 ## Priority 5: Automated QA and Regression Testing
 
-The test suite in [`tests/`](file:///e:/RoadVision/tests) was executed:
-- [`tests/test_audit_regression.py`](file:///e:/RoadVision/tests/test_audit_regression.py):
+The test suite in [`tests/`](../tests) was executed:
+- [`tests/test_audit_regression.py`](../tests/test_audit_regression.py):
   - `test_ground_truth_integrity_check`: Catches dummy/constant masks.
   - `test_cityscapes_label_mapping_alignment`: Validates SegFormer 19 classes against official Cityscapes trainIds.
   - `test_ignore_index_strict_filtering`: Ensures label 255 never contaminates confusion matrix or metrics.
   - `test_corruption_monotonic_degradation_under_fog`: Verifies monotonic physical loss under atmospheric scattering.
-- [`tests/test_metrics.py`](file:///e:/RoadVision/tests/test_metrics.py): 5 unit tests for confusion matrix, IoU, mIoU, and pixel accuracy.
-- [`tests/test_corruptions.py`](file:///e:/RoadVision/tests/test_corruptions.py): 6 unit tests for determinism, monotonicity, and shape preservation.
-- [`tests/test_inference.py`](file:///e:/RoadVision/tests/test_inference.py): 4 integration tests for inference, dimension preservation, and error handling.
+- [`tests/test_metrics.py`](../tests/test_metrics.py): 5 unit tests for confusion matrix, IoU, mIoU, and pixel accuracy.
+- [`tests/test_corruptions.py`](../tests/test_corruptions.py): 6 unit tests for determinism, monotonicity, and shape preservation.
+- [`tests/test_inference.py`](../tests/test_inference.py): 4 integration tests for inference, dimension preservation, and error handling.
 
 **Test Status:** All 19 tests executed and passed (`Ran 19 tests in 10.101s - OK`).
 
