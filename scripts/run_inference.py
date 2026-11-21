@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import argparse
 import json
-import cv2
 from PIL import Image
 from src.inference import RoadVisionSegmentor
 from src.video_processor import VideoProcessor
@@ -79,7 +78,9 @@ def main():
         Image.fromarray(res["colored_mask"]).save(mask_path)
         Image.fromarray(res["overlay"]).save(overlay_path)
         
-        legend_img = create_legend_image(res["present_classes"])
+        legend_img = create_legend_image(
+            res["present_classes"], palette=segmentor.palette, class_names=segmentor.class_names
+        )
         Image.fromarray(legend_img).save(legend_path)
         
         telemetry = {

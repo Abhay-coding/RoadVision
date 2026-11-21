@@ -1,15 +1,13 @@
-import os
-import torch
-import torchvision
-from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large, DeepLabV3_MobileNet_V3_Large_Weights
+"""Check that the torchvision DeepLabV3 checkpoint can be loaded."""
 
-os.environ["TORCH_HOME"] = os.path.abspath("E:/RoadVision/.cache/torch")
+import sys
+from pathlib import Path
 
-print("Testing Torchvision DeepLabV3-MobileNetV3...")
-weights = DeepLabV3_MobileNet_V3_Large_Weights.DEFAULT
-model = deeplabv3_mobilenet_v3_large(weights=weights)
-model.eval()
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-print("DeepLabV3 loaded successfully!")
-print("Transforms:", weights.transforms())
-print("Number of parameters:", sum(p.numel() for p in model.parameters()))
+from src.inference import RoadVisionSegmentor
+
+
+if __name__ == "__main__":
+    segmentor = RoadVisionSegmentor(architecture="deeplabv3", device="cpu")
+    print(f"Loaded DeepLabV3 with {len(segmentor.class_names)} classes.")

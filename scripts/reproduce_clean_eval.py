@@ -4,13 +4,14 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import argparse
 import json
 import numpy as np
 from PIL import Image
 from src.inference import RoadVisionSegmentor
 from src.metrics import SegmentationEvaluator
 
-def reproduce_evaluation():
+def reproduce_evaluation(output_dir="outputs/metrics"):
     print("================================================================")
     print("TASK 2: REPRODUCING CLEAN EVALUATION & CLASS CONTRIBUTION BREAKDOWN")
     print("================================================================")
@@ -26,7 +27,7 @@ def reproduce_evaluation():
     data_dir = "data/samples/authentic"
     label_dir = "data/labels/authentic"
     
-    segmentor = RoadVisionSegmentor(device="cpu")
+    segmentor = RoadVisionSegmentor(device="cpu", input_size=(512, 512))
     id2label = segmentor.class_names
     
     per_image_results = []
@@ -143,11 +144,14 @@ def reproduce_evaluation():
         "per_image_results": per_image_results
     }
     
-    out_file = "outputs/metrics/clean_eval_reproduction.json"
+    os.makedirs(output_dir, exist_ok=True)
+    out_file = os.path.join(output_dir, "clean_eval_reproduction.json")
     with open(out_file, "w") as f:
         json.dump(reproduction_payload, f, indent=2)
     print(f"\nSaved reproduction metrics to: {out_file}")
 
 if __name__ == "__main__":
-    reproduce_evaluation()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", default="outputs/metrics")
+    reproduce_evaluation(parser.parse_args().output_dir)
 

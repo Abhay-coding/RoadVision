@@ -1,9 +1,8 @@
 # RoadVision: Autonomous Road-Scene Semantic Understanding & Robustness System
 
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![PyTorch 2.15](https://img.shields.io/badge/PyTorch-2.15-ee4c2c.svg)](https://pytorch.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c.svg)](https://pytorch.org/)
 [![Transformers](https://img.shields.io/badge/Transformers-SegFormer-yellow.svg)](https://huggingface.co/nvidia/segformer-b0-finetuned-cityscapes-1024-1024)
-[![Tests Passing](https://img.shields.io/badge/Tests-19%2F19%20Passing-brightgreen.svg)]()
 [![Clean mIoU](https://img.shields.io/badge/Clean%20mIoU-38.98%25-success.svg)]()
 [![Pixel Accuracy](https://img.shields.io/badge/Pixel%20Accuracy-94.47%25-success.svg)]()
 
@@ -35,7 +34,7 @@ RoadVision is an evaluation-ready autonomous-driving road-scene understanding sy
    - Classifies 19 Cityscapes road categories: Road, Sidewalk, Building, Wall, Fence, Pole, Traffic Light, Traffic Sign, Vegetation, Terrain, Sky, Person, Rider, Car, Truck, Bus, Train, Motorcycle, Bicycle.
 2. **Dual Model Support:**
    - Primary: **SegFormer-B0** (`nvidia/segformer-b0-finetuned-cityscapes-1024-1024`, 3.7M parameters).
-   - Secondary: **DeepLabV3-MobileNetV3** from torchvision.
+   - Secondary: **DeepLabV3-MobileNetV3** from torchvision for PASCAL VOC object classes. The Cityscapes ground-truth benchmarks use SegFormer.
 3. **OpenCV Video Stream Processing:**
    - Dashcam video inference with configurable frame skipping ($k$-factor), latency tracking, and real-time HUD telemetry.
 4. **Adverse Environmental Robustness Benchmark:**
@@ -118,17 +117,20 @@ RoadVision/
 ## ⚙️ Installation & Setup
 
 ### Prerequisites
-- Python 3.10+ (tested on Python 3.12)
+- Python 3.11 or 3.12 (verified on Windows with Python 3.11)
 - High-capacity storage recommended for model weight caching
 
 ### Clone & Install Dependencies
 ```powershell
-git clone https://github.com/YourRepo/RoadVision.git
+git clone --branch fix/video-playback-ui https://github.com/Zylus08/RoadVision.git
 cd RoadVision
 
-# Install dependencies
-pip install -r requirements.txt
+# Create an isolated environment and install dependencies
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+Activate the virtual environment before running the commands below. In PowerShell, run `.\.venv\Scripts\Activate.ps1`. The first inference run downloads the selected model weights. Once the weights are cached, set `$env:HF_HUB_OFFLINE = '1'` to run SegFormer offline. The video pipeline uses FFmpeg from `imageio-ffmpeg` to produce H.264 MP4.
 
 ---
 
@@ -156,7 +158,7 @@ python scripts/run_inference.py --input data/samples/sample_dashcam.mp4 --frame-
 ### 3. Adverse Weather Robustness Testing
 Run the complete 25-condition robustness grid (Low light, Fog, Rain, Blur, Noise $\times$ 5 severities):
 ```powershell
-python scripts/robustness_test.py --samples 4 --seed 42
+python scripts/robustness_test.py --data-dir data/samples/authentic --label-dir data/labels/authentic --samples 4 --seed 42
 ```
 *Outputs generated:*
 - `outputs/metrics/robustness_benchmark.json` (Complete quantitative drop metrics)
@@ -167,7 +169,7 @@ python scripts/robustness_test.py --samples 4 --seed 42
 ### 4. Quantitative Dataset Evaluation
 Evaluate model predictions against ground truth labels:
 ```powershell
-python scripts/evaluate.py --max-samples 10
+python scripts/evaluate.py --data-dir data/samples/authentic --label-dir data/labels/authentic --max-samples 5
 ```
 *Outputs generated:*
 - `outputs/metrics/clean_eval.json`
@@ -189,23 +191,13 @@ Execute the test suite to verify metric correctness, corruption determinism, and
 python -m unittest discover -s tests -v
 ```
 
-**Results:**
-```text
-test_all_corruptions_registered (test_corruptions.TestCorruptions) ... ok
-test_deterministic_reproducibility (test_corruptions.TestCorruptions) ... ok
-test_gaussian_noise_monotonic_variance (test_corruptions.TestCorruptions) ... ok
-test_invalid_corruption_type (test_corruptions.TestCorruptions) ... ok
-test_low_light_monotonic_dimming (test_corruptions.TestCorruptions) ... ok
-test_output_shape_and_dtype (test_corruptions.TestCorruptions) ... ok
-test_color_mask_and_overlay_functions (test_inference.TestInference) ... ok
-test_configuration_loading (test_inference.TestInference) ... ok
-test_nonexistent_image_error_handling (test_inference.TestInference) ... ok
-test_synthetic_image_inference (test_inference.TestInference) ... ok
-test_degradation_calculation (test_metrics.TestSegmentationMetrics) ... ok
-test_ignore_index_exclusion (test_metrics.TestSegmentationMetrics) ... ok
-test_manual_confusion_matrix (test_metrics.TestSegmentationMetrics) ... ok
-test_perfect_prediction (test_metrics.TestSegmentationMetrics) ... ok
-test_shape_mismatch_error (test_metrics.TestSegmentationMetrics) ... ok
+Run the deliverable smoke test to validate the published artifacts and execute image inference on an authentic sample.
+
+```powershell
+python scripts/smoke_test_deliverables.py
+```
+
+Prediction files are generated locally. The evaluation dashboard reads the published benchmark reports and plots checked into Git.
 
 ----------------------------------------------------------------------
 Ran 19 tests in 10.10s
@@ -218,6 +210,13 @@ OK (19/19 Passed)
 ## 📊 Experimental Results
 
 > **Evaluation Subset Note:** The quantitative clean baseline and adverse weather robustness benchmark were evaluated on an authentic pilot validation subset consisting of 5 paired driving sequences from the Cityscapes Frankfurt validation set (`frankfurt_000000_000294` through `001751`). Due to CPU execution mode, this 5-scene subset serves as a rigorous pilot validation sanity check rather than a full 500-image Cityscapes benchmark.
+
+The published benchmark uses 512×512 SegFormer input. Interactive inference and the general evaluation command use the current configuration, which defaults to 1024×1024. To reproduce the published settings and save new results locally, run:
+
+```powershell
+python scripts/reproduce_clean_eval.py --output-dir outputs/test-runs/metrics
+python scripts/run_verified_robustness_benchmark.py --output-dir outputs/test-runs/metrics --plot-dir outputs/test-runs/plots
+```
 
 ### Benchmark Conventions:
 - **Dataset-Level Aggregate mIoU:** **38.98%** (computed from accumulated $19 \times 19$ confusion matrix over $9,117,536$ valid pixels across all 18 evaluated classes).
@@ -246,7 +245,7 @@ A comprehensive oral examination study guide covering all 15 semester laboratory
 
 ## ⚠️ Known Limitations
 
-1. **CPU Execution Throughput:** In CPU execution mode (`torch 2.15.0+cpu`), forward-pass inference runs at ~1.7 to 2.0 FPS (~550 ms) for high-resolution road scenes. GPU acceleration (CUDA) is recommended for real-time (30+ FPS) operations.
+1. **CPU Execution Throughput:** In the reported CPU benchmark, forward-pass inference runs at ~1.7 to 2.0 FPS (~550 ms) for high-resolution road scenes. GPU acceleration (CUDA) is recommended for real-time (30+ FPS) operations.
 2. **Evaluation Sample Scale:** Quantitative metrics are validated on a 5-scene pilot subset. Running the full 500-image Cityscapes validation split on CPU requires several hours.
 3. **Temporal Consistency:** Frames in video processing are processed per-frame without optical-flow temporal smoothing, which can produce subtle mask flicker across consecutive frames.
 4. **Synthetic Domain Gap:** Synthetic corruptions approximate adverse weather mathematically (Koschmieder atmospheric scattering, directional motion blur streaks), but cannot replicate all complex real-world physical dynamics (e.g., lens water droplets, dynamic windshield wiper motion, road puddle reflections).

@@ -90,8 +90,8 @@ def corrupt_rain(image: np.ndarray, severity: int = 1, seed: int = None) -> np.n
     Returns:
         Corrupted RGB image uint8 (H, W, 3).
     """
-    # Use Generator for thread-safe random operations
-    rng = np.random.default_rng(seed)
+    # A local MT19937 generator preserves the published seeded results.
+    rng = np.random.RandomState(seed)
 
     severity = max(1, min(5, severity))
     corruption_config = get_corruption_config()
@@ -105,12 +105,13 @@ def corrupt_rain(image: np.ndarray, severity: int = 1, seed: int = None) -> np.n
 
     # Generate random streak centers
     num_drops = configs["drops"]
-    x = rng.integers(0, W, num_drops)
-    y = rng.integers(0, H, num_drops)
+    x = rng.randint(0, W, num_drops)
+    y = rng.randint(0, H, num_drops)
     intensity = rng.uniform(150, 255, num_drops)
 
-    # Vectorized scatter using np.add.at (handles duplicates correctly)
-    np.add.at(streak_mask, (y, x), intensity)
+    # The last streak wins when multiple centers fall on the same pixel.
+    for xi, yi, value in zip(x, y, intensity):
+        streak_mask[yi, xi] = value
 
     # Create directional motion blur kernel for rain streak elongation
     length = configs["length"]
@@ -165,8 +166,8 @@ def corrupt_gaussian_noise(image: np.ndarray, severity: int = 1, seed: int = Non
     Returns:
         Corrupted RGB image uint8 (H, W, 3).
     """
-    # Use Generator for thread-safe random operations
-    rng = np.random.default_rng(seed)
+    # A local MT19937 generator preserves the published seeded results.
+    rng = np.random.RandomState(seed)
 
     severity = max(1, min(5, severity))
     corruption_config = get_corruption_config()

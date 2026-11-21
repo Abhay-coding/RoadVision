@@ -8,7 +8,6 @@ import json
 import numpy as np
 import cv2
 from PIL import Image
-import matplotlib.pyplot as plt
 
 from src.inference import RoadVisionSegmentor
 from src.visualization import color_mask, overlay_mask, CITYSCAPES_CLASSES, CITYSCAPES_PALETTE
@@ -27,7 +26,8 @@ def main():
     out_dir = "outputs/plots/audit_visualizations"
     os.makedirs(out_dir, exist_ok=True)
     
-    segmentor = RoadVisionSegmentor(device="cpu")
+    segmentor = RoadVisionSegmentor(device="cpu", input_size=(512, 512))
+    import matplotlib.pyplot as plt
     
     samples = [
         "frankfurt_000000_000294",

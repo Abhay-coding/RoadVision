@@ -22,31 +22,29 @@ if os.getcwd() not in sys.path:
 
 import glob
 import json
-import time
-import cv2
+import logging
 import numpy as np
 import pandas as pd
 from PIL import Image
 import streamlit as st
 import tempfile
+from pathlib import Path
 
-from src.config import get_config, get_model_config, get_corruption_config, get_evaluation_config, get_video_config
+from src.config import get_model_config
 from src.inference import RoadVisionSegmentor
-from src.video_processor import VideoProcessor
-# processed_video_path imported lazily inside the function to avoid Streamlit import issues
+from src.video_processor import VideoProcessor, processed_video_path
 from src.corruptions import apply_corruption, CORRUPTION_REGISTRY
 from src.visualization import (
-    CITYSCAPES_CLASSES,
-    CITYSCAPES_PALETTE,
-    color_mask,
     overlay_mask,
     image_to_data_uri,
     create_diff_map,
     create_legend_image
 )
 from src.metrics import SegmentationEvaluator, compute_degradation
-from src.constants import get_num_classes, get_ignore_index, get_max_display_width, get_max_display_height
+from src.constants import get_ignore_index, get_max_display_width, get_max_display_height
 
+
+logger = logging.getLogger(__name__)
 
 # Page Configuration
 st.set_page_config(
@@ -172,10 +170,10 @@ def load_segmentor(model_name: str, architecture: str, device: str = "auto", inp
     )
 
 
-def display_image_with_caption(image, caption, use_container_width=True):
+def display_image_with_caption(image, caption):
     """Helper to display image with consistent formatting."""
     display_img = prepare_image_for_display(image)
-    st.image(display_img, caption=caption, use_container_width=use_container_width)
+    st.image(display_img, caption=caption, width="stretch")
 
 
 def main():
@@ -183,7 +181,6 @@ def main():
     st.markdown('<div class="subtitle">Autonomous Road-Scene Semantic Understanding & Adverse Environmental Robustness Evaluation</div>', unsafe_allow_html=True)
 
     # Sidebar
-    st.sidebar.image("https://img.icons8.com/fluency/96/car.png", width=64)
     st.sidebar.title("Navigation")
 
     section = st.sidebar.radio(
@@ -212,12 +209,13 @@ def main():
     input_size = tuple(model_config.get("input_size", [512, 512]))
     cache_dir = model_config.get("cache_dir")
 
-    try:
-        segmentor = load_segmentor(model_id, arch_choice, device=device_opt, input_size=input_size, cache_dir=cache_dir)
-        st.sidebar.success(f"Model Ready: {segmentor.architecture.upper()} ({segmentor.device})")
-    except Exception as e:
-        st.sidebar.error(f"Error loading model: {e}")
-        return
+    if section != "Section D: Model Evaluation":
+        try:
+            segmentor = load_segmentor(model_id, arch_choice, device=device_opt, input_size=input_size, cache_dir=cache_dir)
+            st.sidebar.success(f"Model Ready: {segmentor.architecture.upper()} ({segmentor.device})")
+        except Exception as e:
+            st.sidebar.error(f"Error loading model: {e}")
+            return
 
     # SECTION A: IMAGE SEGMENTATION
     if section == "Section A: Image Segmentation":
@@ -258,7 +256,7 @@ def main():
 
                 with tab1:
                     # Dynamically reblend with chosen alpha
-                    blended = overlay_mask(np.array(img_to_process), res["pred_mask"], alpha=alpha)
+                    blended = overlay_mask(np.array(img_to_process), res["colored_mask"], alpha=alpha)
                     display_image_with_caption(blended, "Blended Road-Scene Overlay")
 
                 with tab2:
@@ -290,7 +288,9 @@ def main():
 
                 with col_legend:
                     st.markdown("**Detected Classes:**")
-                    legend_img = create_legend_image(res["present_classes"])
+                    legend_img = create_legend_image(
+                        res["present_classes"], palette=segmentor.palette, class_names=segmentor.class_names
+                    )
                     display_image_with_caption(legend_img, "")
 
     # SECTION B: VIDEO ANALYSIS
@@ -301,27 +301,19 @@ def main():
         sample_videos = sorted(glob.glob("data/samples/*.mp4") + glob.glob("data/samples/*.avi"))
         vid_source = st.radio("Video Source:", ["Sample Dashcam Video", "Upload Video File"], horizontal=True)
 
-        # Initialize temp file tracker in session state
-        if "temp_files" not in st.session_state:
-            st.session_state.temp_files = []
-
         selected_vid_path = None
+        uploaded_video = None
         if vid_source == "Sample Dashcam Video":
             if sample_videos:
-                vid_names = [os.path.basename(v) for v in sample_videos]
-                chosen = st.selectbox("Select sample video:", vid_names)
-                selected_vid_path = os.path.join("data/samples", chosen)
+                selected_vid_path = st.selectbox(
+                    "Select sample video:", sample_videos, format_func=os.path.basename
+                )
             else:
                 st.warning("No sample videos found in data/samples.")
         else:
-            up_vid = st.file_uploader("Upload dashcam video file (MP4/AVI/MOV):", type=["mp4", "avi", "mov"])
-            if up_vid is not None:
-                # Use tempfile to avoid cluttering data/samples
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{up_vid.name}") as tmp_file:
-                    tmp_file.write(up_vid.read())
-                    tmp_path = tmp_file.name
-                selected_vid_path = tmp_path
-                st.session_state.temp_files.append(tmp_path)
+            uploaded_video = st.file_uploader(
+                "Upload dashcam video file (MP4/AVI/MOV):", type=["mp4", "avi", "mov"]
+            )
 
         col_v1, col_v2 = st.columns(2)
         with col_v1:
@@ -329,75 +321,54 @@ def main():
         with col_v2:
             max_frames = st.slider("Maximum Frames to Process:", 10, 100, 30)
 
-        if selected_vid_path and st.button("Process Dashcam Video", type="primary"):
-            st.info(f"Processing video: {selected_vid_path}")
-            from src.video_processor import processed_video_path
-            out_vid_path = processed_video_path(selected_vid_path, "outputs/predictions")
-
+        source_id = uploaded_video.file_id if uploaded_video is not None else selected_vid_path
+        settings = (vid_source, source_id, model_id, device_opt, frame_skip, max_frames)
+        if source_id and st.button("Process Dashcam Video", type="primary"):
+            st.session_state.pop("video_result", None)
+            source_name = uploaded_video.name if uploaded_video is not None else selected_vid_path
+            out_vid_path = processed_video_path(source_name, "outputs/predictions")
             processor = VideoProcessor(segmentor, frame_skip=frame_skip, target_resolution=(640, 360))
             prog_bar = st.progress(0)
             status_text = st.empty()
 
             def update_progress(curr, total, current_fps):
-                prog_bar.progress(min(1.0, curr / total))
-                status_text.text(f"Processing Frame {curr}/{total} | Telemetry: {current_fps:.1f} FPS")
+                if total:
+                    prog_bar.progress(min(1.0, curr / total))
+                frame_count = f"{curr}/{total}" if total else str(curr)
+                status_text.text(f"Processing Frame {frame_count} | Telemetry: {current_fps:.1f} FPS")
 
-            stats = processor.process_video(
-                selected_vid_path,
-                out_vid_path,
-                max_frames=max_frames,
-                progress_callback=update_progress
-            )
-            out_vid_path = stats["output_path"]
-
-            # Validate the output video before displaying
-            video_valid = False
-            video_error = None
             try:
-                cap = cv2.VideoCapture(out_vid_path)
-                if cap.isOpened():
-                    ret, frame = cap.read()
-                    if ret and frame is not None:
-                        video_valid = True
-                    cap.release()
-                else:
-                    video_error = "Video file could not be opened"
-            except Exception as e:
-                video_error = str(e)
+                with tempfile.TemporaryDirectory(prefix="roadvision-upload-") as temp_dir:
+                    if uploaded_video is not None:
+                        suffix = Path(uploaded_video.name).suffix.lower()
+                        uploaded_path = Path(temp_dir) / f"upload{suffix}"
+                        uploaded_path.write_bytes(uploaded_video.getbuffer())
+                        selected_vid_path = str(uploaded_path)
+                    stats = processor.process_video(
+                        selected_vid_path, out_vid_path,
+                        max_frames=max_frames, progress_callback=update_progress
+                    )
+                st.session_state.video_result = (settings, stats)
+            except Exception as error:
+                logger.exception("Dashcam video processing failed")
+                st.error(f"Video processing failed: {error}")
+            finally:
+                prog_bar.empty()
+                status_text.empty()
 
-            if video_valid:
+        result = st.session_state.get("video_result")
+        if result and result[0] == settings:
+            stats = result[1]
+            out_vid_path = stats["output_path"]
+            if os.path.isfile(out_vid_path):
                 st.success("Video processing complete!")
-
-                # Telemetry Metrics Grid
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Total Frames", stats["total_frames_read"])
                 m2.metric("Inferred Frames", stats["frames_inferred"])
                 m3.metric("Avg Model Latency", f"{stats['model_latency_mean_ms']} ms")
                 m4.metric("Pipeline FPS", f"{stats['overall_fps']} FPS")
-
                 st.write(f"Processed video saved to: `{out_vid_path}`")
-
-                # Display video with proper format detection
-                # Check file extension and set appropriate MIME type
-                if out_vid_path.lower().endswith('.webm'):
-                    st.video(out_vid_path, format="video/webm")
-                elif out_vid_path.lower().endswith('.mp4'):
-                    st.video(out_vid_path, format="video/mp4")
-                else:
-                    st.video(out_vid_path)
-            else:
-                st.error(f"Video processing completed but output video is not playable: {video_error}")
-                st.write(f"Output path: `{out_vid_path}`")
-                st.info("This may be due to missing FFmpeg. Install FFmpeg or `pip install imageio-ffmpeg` for H.264 encoding.")
-
-            # Clean up temp files
-            for tmp_path in st.session_state.temp_files:
-                try:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                except Exception:
-                    pass
-            st.session_state.temp_files = []
+                st.video(out_vid_path, format="video/mp4")
 
     # SECTION C: ROBUSTNESS LAB
     elif section == "Section C: Robustness Lab":
@@ -439,9 +410,9 @@ def main():
                 diff_map = create_diff_map(clean_res["pred_mask"], corrupt_res["pred_mask"])
 
                 # 5. Relative degradation
-                clean_eval = SegmentationEvaluator(num_classes=get_num_classes(), ignore_index=get_ignore_index())
+                clean_eval = SegmentationEvaluator(num_classes=len(segmentor.class_names), ignore_index=get_ignore_index())
                 clean_eval.update(clean_res["pred_mask"], clean_res["pred_mask"])
-                c_eval = SegmentationEvaluator(num_classes=get_num_classes(), ignore_index=get_ignore_index())
+                c_eval = SegmentationEvaluator(num_classes=len(segmentor.class_names), ignore_index=get_ignore_index())
                 c_eval.update(corrupt_res["pred_mask"], clean_res["pred_mask"])
                 deg = compute_degradation(clean_eval.compute(), c_eval.compute())
 
@@ -516,8 +487,6 @@ def main():
         drop_plot = "outputs/plots/verified_robustness_max_severity_drop.png"
         if not os.path.exists(drop_plot):
             drop_plot = "outputs/plots/robustness_max_severity_drop.png"
-
-        grid_plot = "outputs/plots/robustness_visual_comparison_grid.png"
 
         col_p1, col_p2 = st.columns(2)
         with col_p1:

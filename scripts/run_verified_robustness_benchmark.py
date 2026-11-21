@@ -4,9 +4,9 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import argparse
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 from PIL import Image
 
 from src.inference import RoadVisionSegmentor
@@ -15,6 +15,10 @@ from src.metrics import SegmentationEvaluator, compute_degradation
 from src.visualization import CITYSCAPES_CLASSES, CITYSCAPES_PALETTE, color_mask, overlay_mask
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", default="outputs/metrics")
+    parser.add_argument("--plot-dir", default="outputs/plots")
+    args = parser.parse_args()
     print("================================================================")
     print("ROADVISION AUDIT: VERIFIED ADVERSE WEATHER ROBUSTNESS BENCHMARK")
     print("================================================================")
@@ -29,12 +33,13 @@ def main():
     
     data_dir = "data/samples/authentic"
     label_dir = "data/labels/authentic"
-    out_dir = "outputs/metrics"
-    plot_dir = "outputs/plots"
+    out_dir = args.output_dir
+    plot_dir = args.plot_dir
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(plot_dir, exist_ok=True)
     
-    segmentor = RoadVisionSegmentor(device="cpu")
+    segmentor = RoadVisionSegmentor(device="cpu", input_size=(512, 512))
+    import matplotlib.pyplot as plt
     
     # Load clean images and ground truth masks
     clean_images = []

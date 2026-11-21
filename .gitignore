@@ -25,7 +25,65 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Output media (preserve directory structure)
-outputs/predictions/*.mp4
-outputs/predictions/*.avi
+# Local development settings and tools
+/AGENTS.md
+/.claude/
+/.claude-flow/
+/.swarm/
+/.vscode/
+/.idea/
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
 
+# Legacy cache path created by unexpanded ~
+/~/
+
+# Accidental shell artifacts from earlier edits
+/0
+/8
+/Dict\[str
+/MJPG,-
+/np.ndarray
+/str
+/config.yml
+
+# Generated predictions and scratch output
+/outputs/predictions/
+/outputs/smoke/
+/outputs/test-runs/
+
+# Published benchmark reports and figures are versioned.
+# Ignore other files generated in these directories.
+/outputs/metrics/*
+!/outputs/metrics/clean_eval.json
+!/outputs/metrics/clean_eval_reproduction.json
+!/outputs/metrics/dataset_provenance_audit.json
+!/outputs/metrics/robustness_audit_integrity.json
+!/outputs/metrics/robustness_benchmark.json
+!/outputs/metrics/verified_clean_eval.json
+!/outputs/metrics/verified_robustness_benchmark.json
+/outputs/plots/*
+!/outputs/plots/per_class_iou.png
+!/outputs/plots/robustness_degradation_curves.png
+!/outputs/plots/robustness_max_severity_drop.png
+!/outputs/plots/robustness_visual_comparison_grid.png
+!/outputs/plots/verified_per_class_iou.png
+!/outputs/plots/verified_robustness_degradation_curves.png
+!/outputs/plots/verified_robustness_max_severity_drop.png
+!/outputs/plots/audit_visualizations/
+/outputs/plots/audit_visualizations/*
+!/outputs/plots/audit_visualizations/audit_clean_evaluation.json
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_accuracy_map.png
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_ground_truth.png
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_original.png
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_overlay.png
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_predicted_mask.png
+!/outputs/plots/audit_visualizations/frankfurt_000000_*_side_by_side.png
+/outputs/**/.roadvision-video-*/

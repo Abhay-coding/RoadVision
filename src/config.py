@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
+from uuid import uuid4
 import yaml
 
 
@@ -41,7 +42,7 @@ class Config:
             self._config.setdefault("model", {})["cache_dir"] = os.environ["HF_HOME"]
         elif "HF_HOME" not in os.environ and "model" in self._config and "cache_dir" in self._config["model"]:
             # Validate the config path is usable before setting as env var
-            cache_dir = self._config["model"]["cache_dir"]
+            cache_dir = os.path.expanduser(self._config["model"]["cache_dir"])
             if self._is_path_usable(cache_dir):
                 os.environ["HF_HOME"] = cache_dir
 
@@ -49,7 +50,7 @@ class Config:
         if "TORCH_HOME" in os.environ:
             self._config.setdefault("model", {})["torch_cache_dir"] = os.environ["TORCH_HOME"]
         elif "TORCH_HOME" not in os.environ and "model" in self._config and "torch_cache_dir" in self._config["model"]:
-            torch_cache_dir = self._config["model"]["torch_cache_dir"]
+            torch_cache_dir = os.path.expanduser(self._config["model"]["torch_cache_dir"])
             if self._is_path_usable(torch_cache_dir):
                 os.environ["TORCH_HOME"] = torch_cache_dir
 
@@ -133,16 +134,13 @@ def get_cache_dir() -> str:
 def _is_path_usable_impl(path: str) -> bool:
     """Check if a path is usable (exists or can be created)."""
     try:
-        p = Path(path)
-        # Check if parent directory exists and is writable
-        parent = p.parent if p.suffix else p
-        parent.mkdir(parents=True, exist_ok=True)
-        # Test write access
-        test_file = parent / ".write_test"
-        test_file.touch()
-        test_file.unlink()
+        directory = Path(path).expanduser()
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / f".roadvision-{uuid4().hex}.tmp"
+        probe.touch(exist_ok=False)
+        probe.unlink()
         return True
-    except (OSError, PermissionError):
+    except OSError:
         return False
 
 

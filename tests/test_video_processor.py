@@ -55,9 +55,11 @@ class TestVideoProcessor(unittest.TestCase):
             self.assertEqual(header[4:8], b"ftyp", "MP4 file should start with ftyp box")
 
         capture = cv2.VideoCapture(self.output_path)
-        self.assertTrue(capture.isOpened())
         decoded_frames = []
         try:
+            self.assertTrue(capture.isOpened())
+            codec = int(capture.get(cv2.CAP_PROP_FOURCC)).to_bytes(4, "little").lower()
+            self.assertIn(codec, (b"avc1", b"h264"))
             while True:
                 ok, frame = capture.read()
                 if not ok:
@@ -88,9 +90,21 @@ class TestVideoProcessor(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "Failed to initialize video writer"):
                     processor.process_video(self.input_path, self.output_path)
 
-        # writer is set to None when it fails to open, so release is not called
-        failed_writer.release.assert_not_called()
+        failed_writer.release.assert_called_once()
         failed_capture.release.assert_called_once()
+
+    def test_encoder_failure_keeps_prior_output_and_cleans_temporary_files(self):
+        processor = VideoProcessor(_StubSegmentor())
+        with open(self.output_path, "wb") as previous:
+            previous.write(b"prior result")
+
+        with patch.object(processor, "_transcode_to_h264_mp4", side_effect=RuntimeError("encoder failed")):
+            with self.assertRaisesRegex(RuntimeError, "encoder failed"):
+                processor.process_video(self.input_path, self.output_path)
+
+        with open(self.output_path, "rb") as previous:
+            self.assertEqual(previous.read(), b"prior result")
+        self.assertCountEqual(os.listdir(self.temp_dir.name), ["input.avi", "processed.mp4"])
 
     def test_processed_video_path_uses_mp4_extension(self):
         path_builder = getattr(video_processor, "processed_video_path", None)

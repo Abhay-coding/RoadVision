@@ -1,20 +1,13 @@
-import os
+"""Check that the configured SegFormer checkpoint can be loaded."""
+
 import sys
+from pathlib import Path
 
-# Ensure caches stay on E: drive
-os.environ["HF_HOME"] = os.path.abspath("E:/RoadVision/.cache/huggingface")
-os.environ["TORCH_HOME"] = os.path.abspath("E:/RoadVision/.cache/torch")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
+from src.inference import RoadVisionSegmentor
 
-model_id = "nvidia/segformer-b0-finetuned-cityscapes-512-512"
-print(f"Loading processor for {model_id}...")
-processor = SegformerImageProcessor.from_pretrained(model_id, cache_dir=os.environ["HF_HOME"])
 
-print(f"Loading model weights for {model_id}...")
-model = SegformerForSemanticSegmentation.from_pretrained(model_id, cache_dir=os.environ["HF_HOME"])
-model.eval()
-
-print("Model successfully loaded!")
-print(f"Number of classes: {len(model.config.id2label)}")
-print(f"Class labels: {model.config.id2label}")
+if __name__ == "__main__":
+    segmentor = RoadVisionSegmentor(device="cpu")
+    print(f"Loaded {segmentor.model_name} with {len(segmentor.class_names)} classes.")
